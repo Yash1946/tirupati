@@ -1,0 +1,59 @@
+# =========================================================
+# ASSIGNMENT 5
+# Morphology using Add-Delete Table
+# =========================================================
+
+# =========================================================
+# STEP 1: Define Words and Morphological Changes
+# =========================================================
+
+# List containing:
+# Root Word, Operation, Affix, New Word
+
+morphology_data = [
+
+    ["play", "Add", "ing", "playing"],
+    ["teach", "Add", "er", "teacher"],
+    ["happy", "Add", "ness", "happiness"],
+    ["kind", "Add", "ly", "kindly"],
+    ["move", "Add", "ment", "movement"],
+
+    ["playing", "Delete", "ing", "play"],
+    ["teacher", "Delete", "er", "teach"],
+    ["happiness", "Delete", "ness", "happy"],
+    ["kindly", "Delete", "ly", "kind"],
+    ["movement", "Delete", "ment", "move"]
+
+]
+# =========================================================
+# STEP 2: Display Add-Delete Table
+# =========================================================
+
+print("\n===================================================")
+print("Morphology using Add-Delete Table")
+print("===================================================\n")
+
+# Print table header
+print(f"{'Root Word':<15}{'Operation':<15}{'Affix':<15}{'Result Word'}")
+
+print("-" * 60)
+
+# Print table rows
+for row in morphology_data:
+
+    root_word = row[0]
+    operation = row[1]
+    affix = row[2]
+    result_word = row[3]
+
+    print(f"{root_word:<15}{operation:<15}{affix:<15}{result_word}")
+# =========================================================
+# STEP 3: Explanation
+# =========================================================
+
+print("\n===================================================")
+print("Explanation")
+print("===================================================\n")
+
+print("Add Operation    : Affix is added to the root word.")
+print("Delete Operation : Affix is removed from the word.")

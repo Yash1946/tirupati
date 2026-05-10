@@ -1,0 +1,583 @@
+# =========================================================
+# Assignment 2
+# BoW, TF-IDF, Word2Vec using PyTorch
+# =========================================================
+
+
+# ---------------------------------------------------------
+# Step 1: Import Required Libraries
+# ---------------------------------------------------------
+
+import os
+import numpy as np
+import pandas as pd
+import nltk
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+from collections import Counter
+
+nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
+nltk.download('stopwords', quiet=True)
+
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+
+print('All libraries imported successfully!')
+
+
+# ---------------------------------------------------------
+# Step 2: Prepare Dataset
+# ---------------------------------------------------------
+
+# Create a small dataset and save it to the Data folder
+os.makedirs('Data', exist_ok=True)
+
+# Sample documents for text representation
+documents = [
+    'Natural language processing is a field of artificial intelligence.',
+    'Machine learning and deep learning are subsets of artificial intelligence.',
+    'Text mining involves extracting useful information from text data.',
+    'Sentiment analysis determines the emotional tone of text.',
+    'Named entity recognition identifies entities like names and locations.',
+    'Word embeddings represent words as dense vectors in continuous space.',
+    'Tokenization breaks text into individual words or subwords.',
+    'Language models predict the next word in a sequence of text.',
+    'Neural networks are used extensively in modern NLP applications.',
+    'Transfer learning has revolutionized natural language processing tasks.'
+]
+
+# Save to CSV in Data folder
+df = pd.DataFrame({
+    'text': documents,
+    'doc_id': range(1, len(documents) + 1)
+})
+
+df.to_csv('Data/nlp_documents.csv', index=False)
+
+print(f'Dataset created with {len(documents)} documents')
+print('Saved to: Data/nlp_documents.csv')
+
+print()
+
+for i, doc in enumerate(documents, 1):
+    print(f'Doc {i}: {doc}')
+
+
+# =========================================================
+# Step 3: Bag of Words (Count Occurrence)
+# =========================================================
+
+# Bag of Words using CountVectorizer
+count_vectorizer = CountVectorizer()
+
+# Fit and transform the documents
+bow_matrix = count_vectorizer.fit_transform(documents)
+
+# Get feature names (vocabulary)
+feature_names = count_vectorizer.get_feature_names_out()
+
+# Convert to DataFrame for better visualization
+bow_df = pd.DataFrame(
+    bow_matrix.toarray(),
+    columns=feature_names,
+    index=[f'Doc_{i+1}' for i in range(len(documents))]
+)
+
+print('\nBag of Words Representation:')
+
+print(f'Vocabulary size: {len(feature_names)}')
+
+print(f'Matrix shape: {bow_matrix.shape}')
+
+print()
+
+# Show first 5 documents with first 10 features
+print(bow_df.iloc[:5, :10])
+
+
+# ---------------------------------------------------------
+# Top frequent words
+# ---------------------------------------------------------
+
+# Show the top 10 most frequent words across all documents
+
+word_counts = bow_matrix.toarray().sum(axis=0)
+
+word_freq = pd.DataFrame({
+    'word': feature_names,
+    'count': word_counts
+}).sort_values('count', ascending=False).head(10)
+
+print('\nTop 10 Most Frequent Words:')
+
+print(word_freq.to_string(index=False))
+
+
+# =========================================================
+# Step 4: Normalized Bag of Words
+# =========================================================
+
+# Normalized Bag of Words
+# Divide each row by its sum to get relative frequencies
+
+bow_array = bow_matrix.toarray().astype(float)
+
+row_sums = bow_array.sum(axis=1, keepdims=True)
+
+# Avoid division by zero
+normalized_bow = np.divide(
+    bow_array,
+    row_sums,
+    where=row_sums != 0
+)
+
+# Convert to DataFrame
+normalized_df = pd.DataFrame(
+    np.round(normalized_bow, 4),
+    columns=feature_names,
+    index=[f'Doc_{i+1}' for i in range(len(documents))]
+)
+
+print('\nNormalized Bag of Words Representation:')
+
+print('(Values represent relative frequency of each word in the document)')
+
+print()
+
+# Show first 5 documents with first 10 features
+print(normalized_df.iloc[:5, :10])
+
+
+# ---------------------------------------------------------
+# Verify normalization
+# ---------------------------------------------------------
+
+# Verify normalization: each row should sum to 1.0
+
+print('\nRow sums (should all be ~1.0):')
+
+for i in range(len(documents)):
+
+    print(
+        f'Doc_{i+1}: '
+        f'{normalized_bow[i].sum():.4f}'
+    )
+
+
+# =========================================================
+# Step 5: TF-IDF Representation
+# =========================================================
+
+# TF-IDF using TfidfVectorizer
+
+tfidf_vectorizer = TfidfVectorizer()
+
+# Fit and transform
+tfidf_matrix = tfidf_vectorizer.fit_transform(documents)
+
+tfidf_features = tfidf_vectorizer.get_feature_names_out()
+
+# Convert to DataFrame
+tfidf_df = pd.DataFrame(
+    np.round(tfidf_matrix.toarray(), 4),
+    columns=tfidf_features,
+    index=[f'Doc_{i+1}' for i in range(len(documents))]
+)
+
+print('\nTF-IDF Representation:')
+
+print(f'Matrix shape: {tfidf_matrix.shape}')
+
+print()
+
+# Show first 5 documents with first 10 features
+print(tfidf_df.iloc[:5, :10])
+
+
+# ---------------------------------------------------------
+# Top TF-IDF words
+# ---------------------------------------------------------
+
+# Show words with highest TF-IDF scores for each document
+
+print('\nTop 3 words by TF-IDF score for each document:')
+
+print('-' * 60)
+
+for i in range(len(documents)):
+
+    scores = tfidf_matrix[i].toarray().flatten()
+
+    top_indices = scores.argsort()[-3:][::-1]
+
+    top_words = [
+        (
+            tfidf_features[j],
+            round(scores[j], 4)
+        )
+        for j in top_indices
+    ]
+
+    print(f'Doc_{i+1}: {top_words}')
+
+
+# =========================================================
+# Step 6: Word2Vec Embeddings (Skip-Gram using PyTorch)
+# =========================================================
+
+# Tokenize and clean documents for Word2Vec
+
+stop_words = set(stopwords.words('english'))
+
+tokenized_docs = []
+
+all_words = []
+
+for doc in documents:
+
+    tokens = word_tokenize(doc.lower())
+
+    tokens = [
+        t for t in tokens
+        if t.isalpha() and t not in stop_words
+    ]
+
+    tokenized_docs.append(tokens)
+
+    all_words.extend(tokens)
+
+print('\nTokenized Documents (after cleaning):')
+
+for i, tokens in enumerate(tokenized_docs, 1):
+
+    print(f'Doc {i}: {tokens}')
+
+
+# ---------------------------------------------------------
+# Build vocabulary
+# ---------------------------------------------------------
+
+word_counts = Counter(all_words)
+
+vocab = sorted(word_counts.keys())
+
+word_to_idx = {
+    w: i for i, w in enumerate(vocab)
+}
+
+idx_to_word = {
+    i: w for w, i in word_to_idx.items()
+}
+
+vocab_size = len(vocab)
+
+print(f'\nVocabulary size: {vocab_size}')
+
+print(f'Vocabulary: {vocab}')
+
+
+# ---------------------------------------------------------
+# Generate Skip-Gram training pairs
+# ---------------------------------------------------------
+
+# For each word, pair it with neighboring words within a context window
+
+window_size = 2
+
+training_pairs = []
+
+for doc_tokens in tokenized_docs:
+
+    for i, target in enumerate(doc_tokens):
+
+        # Get context words within the window
+        start = max(0, i - window_size)
+
+        end = min(len(doc_tokens), i + window_size + 1)
+
+        for j in range(start, end):
+
+            if i != j:  # Skip the target word itself
+
+                context = doc_tokens[j]
+
+                training_pairs.append(
+                    (
+                        word_to_idx[target],
+                        word_to_idx[context]
+                    )
+                )
+
+print(f'\nTotal training pairs: {len(training_pairs)}')
+
+print('\nSample pairs (first 10):')
+
+for t, c in training_pairs[:10]:
+
+    print(
+        f'Target: {idx_to_word[t]:<15} '
+        f'-> Context: {idx_to_word[c]}'
+    )
+
+
+# =========================================================
+# Define Skip-Gram Word2Vec model
+# =========================================================
+
+class SkipGramWord2Vec(nn.Module):
+
+    def __init__(self, vocab_size, embedding_dim):
+
+        super(SkipGramWord2Vec, self).__init__()
+
+        # Target word embeddings
+        self.target_embeddings = nn.Embedding(
+            vocab_size,
+            embedding_dim
+        )
+
+        # Context word embeddings
+        self.context_embeddings = nn.Embedding(
+            vocab_size,
+            embedding_dim
+        )
+
+    def forward(self, target, context):
+
+        target_emb = self.target_embeddings(target)
+
+        context_emb = self.context_embeddings(context)
+
+        # Dot product for similarity score
+        scores = torch.sum(
+            target_emb * context_emb,
+            dim=1
+        )
+
+        return scores
+
+    def get_embedding(self, word_idx):
+
+        return self.target_embeddings(
+            torch.tensor([word_idx])
+        ).detach().numpy()[0]
+
+
+# ---------------------------------------------------------
+# Initialize model
+# ---------------------------------------------------------
+
+EMBEDDING_DIM = 30
+
+w2v_model = SkipGramWord2Vec(
+    vocab_size,
+    EMBEDDING_DIM
+)
+
+print('\nSkip-Gram Word2Vec Model:')
+
+print(f'Vocabulary size: {vocab_size}')
+
+print(f'Embedding dim: {EMBEDDING_DIM}')
+
+print(
+    f'Parameters: '
+    f'{sum(p.numel() for p in w2v_model.parameters()):,}'
+)
+
+
+# =========================================================
+# Train the Word2Vec model
+# =========================================================
+
+optimizer = optim.Adam(
+    w2v_model.parameters(),
+    lr=0.01
+)
+
+criterion = nn.BCEWithLogitsLoss()
+
+# Prepare training data (positive pairs)
+
+targets = torch.tensor(
+    [p[0] for p in training_pairs]
+)
+
+contexts = torch.tensor(
+    [p[1] for p in training_pairs]
+)
+
+labels = torch.ones(len(training_pairs))
+
+# Add negative samples (random word pairs)
+
+num_neg = len(training_pairs)
+
+neg_targets = torch.randint(
+    0,
+    vocab_size,
+    (num_neg,)
+)
+
+neg_contexts = torch.randint(
+    0,
+    vocab_size,
+    (num_neg,)
+)
+
+neg_labels = torch.zeros(num_neg)
+
+# Combine positive and negative
+
+all_targets = torch.cat([
+    targets,
+    neg_targets
+])
+
+all_contexts = torch.cat([
+    contexts,
+    neg_contexts
+])
+
+all_labels = torch.cat([
+    labels,
+    neg_labels
+])
+
+# Training loop
+
+print('\nTraining Word2Vec (Skip-Gram)...')
+
+print('-' * 40)
+
+num_epochs = 100
+
+for epoch in range(num_epochs):
+
+    w2v_model.train()
+
+    optimizer.zero_grad()
+
+    scores = w2v_model(
+        all_targets,
+        all_contexts
+    )
+
+    loss = criterion(scores, all_labels)
+
+    loss.backward()
+
+    optimizer.step()
+
+    if (epoch + 1) % 20 == 0:
+
+        print(
+            f'Epoch {epoch+1:3d}/{num_epochs} '
+            f'| Loss: {loss.item():.4f}'
+        )
+
+print('\nTraining complete!')
+
+
+# =========================================================
+# Get word vectors
+# =========================================================
+
+example_words = [
+    'language',
+    'learning',
+    'text',
+    'processing',
+    'neural'
+]
+
+print('\nWord Vectors (first 10 dimensions):')
+
+print('-' * 70)
+
+for word in example_words:
+
+    if word in word_to_idx:
+
+        vector = w2v_model.get_embedding(
+            word_to_idx[word]
+        )[:10]
+
+        formatted = ', '.join(
+            [f'{v:.4f}' for v in vector]
+        )
+
+        print(f'{word:<12}: [{formatted}, ...]')
+
+    else:
+
+        print(f'{word:<12}: Not in vocabulary')
+
+
+# =========================================================
+# Find similar words using cosine similarity
+# =========================================================
+
+import torch.nn.functional as F
+
+def find_similar(word, top_n=3):
+
+    if word not in word_to_idx:
+
+        return []
+
+    word_vec = torch.tensor(
+        w2v_model.get_embedding(
+            word_to_idx[word]
+        )
+    ).unsqueeze(0)
+
+    similarities = []
+
+    for other_word, idx in word_to_idx.items():
+
+        if other_word == word:
+            continue
+
+        other_vec = torch.tensor(
+            w2v_model.get_embedding(idx)
+        ).unsqueeze(0)
+
+        sim = F.cosine_similarity(
+            word_vec,
+            other_vec
+        ).item()
+
+        similarities.append((other_word, sim))
+
+    similarities.sort(
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    return similarities[:top_n]
+
+
+print('\nMost Similar Words (cosine similarity):')
+
+print('-' * 50)
+
+for word in ['language', 'learning', 'text']:
+
+    if word in word_to_idx:
+
+        similar = find_similar(word, 3)
+
+        print(f'\n{word}:')
+
+        for sim_word, score in similar:
+
+            print(
+                f'  -> {sim_word} '
+                f'(similarity: {score:.4f})'
+            )

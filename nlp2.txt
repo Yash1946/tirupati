@@ -1,0 +1,126 @@
+!pip install genism
+# =========================================================
+# ASSIGNMENT 2
+# Bag of Words, TF-IDF and Word2Vec
+# =========================================================
+
+# =========================================================
+# STEP 0: Install gensim (Run only once)
+# =========================================================
+
+# Uncomment the line below if gensim is not installed
+
+# !pip install gensim
+
+
+# =========================================================
+# STEP 1: Import Required Libraries
+# =========================================================
+
+import pandas as pd
+
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from gensim.models import Word2Vec
+
+import nltk
+nltk.download('punkt')
+nltk.download('punkt_tab')
+from nltk.tokenize import word_tokenize
+# =========================================================
+# STEP 2: Define Sample Data
+# =========================================================
+
+documents = [
+    "Natural language processing is very interesting",
+    "Machine learning is a part of artificial intelligence",
+    "Natural language processing and machine learning are related",
+    "Word embeddings are useful in NLP"
+]
+
+print("\n==============================")
+print("Sample Documents")
+print("==============================")
+
+for i, doc in enumerate(documents, 1):
+    print(f"{i}. {doc}")
+
+# =========================================================
+# STEP 3: BAG OF WORDS
+# =========================================================
+
+# ---------------------------------------------------------
+# 3.1 Count Occurrence
+# ---------------------------------------------------------
+
+print("\n==============================")
+print("1. Bag of Words - Count Occurrence")
+print("==============================")
+
+count_vectorizer = CountVectorizer()
+
+bow_matrix = count_vectorizer.fit_transform(documents)
+
+bow_df = pd.DataFrame(
+    bow_matrix.toarray(),
+    columns=count_vectorizer.get_feature_names_out()
+)
+
+print(bow_df)
+
+# ---------------------------------------------------------
+# 3.2 Normalized Count Occurrence
+# ---------------------------------------------------------
+
+print("\n==============================")
+print("2. Bag of Words - Normalized Count Occurrence")
+print("==============================")
+
+normalized_bow = bow_df.div(bow_df.sum(axis=1), axis=0)
+
+print(normalized_bow)
+# =========================================================
+# STEP 4: TF-IDF
+# =========================================================
+
+print("\n==============================")
+print("3. TF-IDF")
+print("==============================")
+
+tfidf_vectorizer = TfidfVectorizer()
+
+tfidf_matrix = tfidf_vectorizer.fit_transform(documents)
+
+tfidf_df = pd.DataFrame(
+    tfidf_matrix.toarray(),
+    columns=tfidf_vectorizer.get_feature_names_out()
+)
+
+print(tfidf_df)
+# STEP 5: WORD2VEC EMBEDDINGS
+# =========================================================
+
+print("\n==============================")
+print("4. Word2Vec Embeddings")
+print("==============================")
+
+# Tokenize documents
+tokenized_data = [word_tokenize(doc.lower()) for doc in documents]
+
+# Create Word2Vec model
+word2vec_model = Word2Vec(
+    sentences=tokenized_data,
+    vector_size=50,
+    window=3,
+    min_count=1,
+    workers=4
+)
+
+# Display vocabulary
+print("\nVocabulary Words:\n")
+print(word2vec_model.wv.index_to_key)
+
+# Display vector for a word
+print("\nWord Vector for 'machine':\n")
+print(word2vec_model.wv['machine'])

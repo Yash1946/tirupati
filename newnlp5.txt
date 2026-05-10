@@ -1,0 +1,632 @@
+# =========================================================
+# ASSIGNMENT 5
+# Morphological Analysis using Add-Delete Table
+# =========================================================
+
+
+# ---------------------------------------------------------
+# Step 1: Import Libraries
+# ---------------------------------------------------------
+
+# No external libraries needed for basic morphology
+# We'll implement everything from scratch
+
+import re
+from collections import defaultdict
+
+print('Ready to implement morphological analysis!')
+
+
+# =========================================================
+# Step 2: Define the Add-Delete Table
+# =========================================================
+
+# Add-Delete Table for English Morphology
+# Each rule: (rule_name, condition, delete, add, example)
+
+add_delete_table = [
+
+    # ==== INFLECTIONAL RULES (Verbs) ====
+
+    {
+        'rule': 'Present Participle (-ing)',
+        'condition': 'ends with consonant',
+        'delete': '',
+        'add': 'ing',
+        'example': 'play -> playing'
+    },
+
+    {
+        'rule': 'Present Participle (-ing, drop e)',
+        'condition': 'ends with e',
+        'delete': 'e',
+        'add': 'ing',
+        'example': 'make -> making'
+    },
+
+    {
+        'rule': 'Past Tense (-ed)',
+        'condition': 'ends with consonant',
+        'delete': '',
+        'add': 'ed',
+        'example': 'play -> played'
+    },
+
+    {
+        'rule': 'Past Tense (-d, ends with e)',
+        'condition': 'ends with e',
+        'delete': '',
+        'add': 'd',
+        'example': 'love -> loved'
+    },
+
+    {
+        'rule': 'Third Person Singular (-s)',
+        'condition': 'ends with consonant (not s/sh/ch/x/z)',
+        'delete': '',
+        'add': 's',
+        'example': 'play -> plays'
+    },
+
+    {
+        'rule': 'Third Person Singular (-es)',
+        'condition': 'ends with s/sh/ch/x/z',
+        'delete': '',
+        'add': 'es',
+        'example': 'watch -> watches'
+    },
+
+    # ==== INFLECTIONAL RULES (Nouns) ====
+
+    {
+        'rule': 'Plural (-s)',
+        'condition': 'ends with consonant (not s/sh/ch/x/z)',
+        'delete': '',
+        'add': 's',
+        'example': 'cat -> cats'
+    },
+
+    {
+        'rule': 'Plural (-es)',
+        'condition': 'ends with s/sh/ch/x/z',
+        'delete': '',
+        'add': 'es',
+        'example': 'box -> boxes'
+    },
+
+    {
+        'rule': 'Plural (-ies, y -> ies)',
+        'condition': 'ends with consonant + y',
+        'delete': 'y',
+        'add': 'ies',
+        'example': 'city -> cities'
+    },
+
+    # ==== DERIVATIONAL RULES ====
+
+    {
+        'rule': 'Negation (un-)',
+        'condition': 'adjective/verb',
+        'delete': '',
+        'add': 'un',
+        'example': 'happy -> unhappy'
+    },
+
+    {
+        'rule': 'Noun from Verb (-tion)',
+        'condition': 'ends with e',
+        'delete': 'e',
+        'add': 'ation',
+        'example': 'explore -> exploration'
+    },
+
+    {
+        'rule': 'Noun from Adjective (-ness)',
+        'condition': 'adjective',
+        'delete': '',
+        'add': 'ness',
+        'example': 'happy -> happiness'
+    },
+
+    {
+        'rule': 'Adjective from Noun (-ful)',
+        'condition': 'noun',
+        'delete': '',
+        'add': 'ful',
+        'example': 'hope -> hopeful'
+    },
+
+    {
+        'rule': 'Adjective from Noun (-less)',
+        'condition': 'noun',
+        'delete': '',
+        'add': 'less',
+        'example': 'hope -> hopeless'
+    },
+
+    {
+        'rule': 'Adverb from Adjective (-ly)',
+        'condition': 'adjective',
+        'delete': '',
+        'add': 'ly',
+        'example': 'quick -> quickly'
+    }
+
+]
+
+
+# ---------------------------------------------------------
+# Display Add-Delete Table
+# ---------------------------------------------------------
+
+print('Add-Delete Table for English Morphology')
+
+print('=' * 80)
+
+print(f'{"Rule":<35} {"Delete":<10} {"Add":<12} {"Example":<25}')
+
+print('-' * 80)
+
+for rule in add_delete_table:
+
+    print(
+        f'{rule["rule"]:<35} '
+        f'{rule["delete"] or "-":<10} '
+        f'{rule["add"]:<12} '
+        f'{rule["example"]:<25}'
+    )
+
+
+# =========================================================
+# Step 3: Implement Morphological Rules
+# =========================================================
+
+# Define vowels and consonants
+
+VOWELS = set('aeiou')
+
+
+def ends_with_consonant_y(word):
+    """
+    Check if word ends with consonant followed by y.
+    """
+
+    return (
+        len(word) > 2 and
+        word[-1] == 'y' and
+        word[-2] not in VOWELS
+    )
+
+
+def ends_with_sibilant(word):
+    """
+    Check if word ends with s, sh, ch, x, or z.
+    """
+
+    return (
+        word.endswith('s') or
+        word.endswith('sh') or
+        word.endswith('ch') or
+        word.endswith('x') or
+        word.endswith('z')
+    )
+
+
+def apply_add_delete(word, delete, add):
+    """
+    Apply add-delete rule:
+    remove 'delete' from end,
+    then append 'add'.
+    """
+
+    if delete and word.endswith(delete):
+
+        word = word[:-len(delete)]
+
+    return word + add
+
+
+print('Helper functions defined successfully!')
+
+
+# =========================================================
+# Generate Word Forms
+# =========================================================
+
+def generate_word_forms(base_word, word_type='noun'):
+    """
+    Generate different morphological forms
+    of a word using Add-Delete table approach.
+    """
+
+    forms = {'base': base_word}
+
+    # -----------------------------------------------------
+    # Verb Rules
+    # -----------------------------------------------------
+
+    if word_type == 'verb':
+
+        # Present participle (-ing)
+
+        if base_word.endswith('e'):
+
+            forms['present_participle'] = apply_add_delete(
+                base_word,
+                'e',
+                'ing'
+            )
+
+        else:
+
+            forms['present_participle'] = apply_add_delete(
+                base_word,
+                '',
+                'ing'
+            )
+
+        # Past tense (-ed / -d)
+
+        if base_word.endswith('e'):
+
+            forms['past_tense'] = apply_add_delete(
+                base_word,
+                '',
+                'd'
+            )
+
+        else:
+
+            forms['past_tense'] = apply_add_delete(
+                base_word,
+                '',
+                'ed'
+            )
+
+        # Third person singular (-s / -es)
+
+        if ends_with_sibilant(base_word):
+
+            forms['third_person'] = apply_add_delete(
+                base_word,
+                '',
+                'es'
+            )
+
+        else:
+
+            forms['third_person'] = apply_add_delete(
+                base_word,
+                '',
+                's'
+            )
+
+    # -----------------------------------------------------
+    # Noun Rules
+    # -----------------------------------------------------
+
+    elif word_type == 'noun':
+
+        # Plural
+
+        if ends_with_consonant_y(base_word):
+
+            forms['plural'] = apply_add_delete(
+                base_word,
+                'y',
+                'ies'
+            )
+
+        elif ends_with_sibilant(base_word):
+
+            forms['plural'] = apply_add_delete(
+                base_word,
+                '',
+                'es'
+            )
+
+        else:
+
+            forms['plural'] = apply_add_delete(
+                base_word,
+                '',
+                's'
+            )
+
+    # -----------------------------------------------------
+    # Adjective Rules
+    # -----------------------------------------------------
+
+    elif word_type == 'adjective':
+
+        # Negation
+        forms['negation'] = 'un' + base_word
+
+        # Noun form (-ness)
+        forms['noun_form'] = apply_add_delete(
+            base_word,
+            '',
+            'ness'
+        )
+
+        # Adverb form (-ly)
+        forms['adverb_form'] = apply_add_delete(
+            base_word,
+            '',
+            'ly'
+        )
+
+    return forms
+
+
+print('Word form generator defined!')
+
+
+# =========================================================
+# Step 4: Demonstrate Word Formation
+# =========================================================
+
+# ---------------------------------------------------------
+# 4.1 Verb Forms
+# ---------------------------------------------------------
+
+verbs = [
+    'play',
+    'make',
+    'love',
+    'watch',
+    'jump',
+    'dance',
+    'push',
+    'buzz'
+]
+
+print('\nVerb Morphology using Add-Delete Table')
+
+print('=' * 70)
+
+print(f'{"Base":<10} {"+ ing":<15} {"+ ed/d":<15} {"+ s/es":<15}')
+
+print('-' * 70)
+
+for verb in verbs:
+
+    forms = generate_word_forms(verb, 'verb')
+
+    print(
+        f'{forms["base"]:<10} '
+        f'{forms["present_participle"]:<15} '
+        f'{forms["past_tense"]:<15} '
+        f'{forms["third_person"]:<15}'
+    )
+
+
+# ---------------------------------------------------------
+# 4.2 Noun Plurals
+# ---------------------------------------------------------
+
+nouns = [
+    'cat',
+    'dog',
+    'box',
+    'church',
+    'city',
+    'baby',
+    'bus',
+    'key',
+    'fox',
+    'dish'
+]
+
+print('\nNoun Pluralization using Add-Delete Table')
+
+print('=' * 60)
+
+print(f'{"Singular":<15} {"Rule Applied":<20} {"Plural":<15}')
+
+print('-' * 60)
+
+for noun in nouns:
+
+    forms = generate_word_forms(noun, 'noun')
+
+    if ends_with_consonant_y(noun):
+
+        rule = 'y -> ies'
+
+    elif ends_with_sibilant(noun):
+
+        rule = '+ es'
+
+    else:
+
+        rule = '+ s'
+
+    print(
+        f'{noun:<15} '
+        f'{rule:<20} '
+        f'{forms["plural"]:<15}'
+    )
+
+
+# =========================================================
+# Step 5: Morphological Analysis (Reverse Process)
+# =========================================================
+
+def analyze_morphology(word):
+    """
+    Analyze a word and attempt to identify
+    its base form and the morphological rule applied.
+    """
+
+    analyses = []
+
+    # -----------------------------------------------------
+    # Check for prefixes
+    # -----------------------------------------------------
+
+    if word.startswith('un'):
+
+        analyses.append({
+            'word': word,
+            'base': word[2:],
+            'operation': 'Prefix: un- (negation)',
+            'delete': '--',
+            'add': 'un-'
+        })
+
+    # -----------------------------------------------------
+    # Check suffix rules
+    # -----------------------------------------------------
+
+    suffix_rules = [
+
+        ('ation', 'e', 'Suffix: -ation (noun from verb)'),
+
+        ('iness', 'y', 'Suffix: -ness (noun from adj, y->iness)'),
+
+        ('ness', '', 'Suffix: -ness (noun from adjective)'),
+
+        ('ies', 'y', 'Suffix: -ies (plural, y->ies)'),
+
+        ('ing', '', 'Suffix: -ing (present participle)'),
+
+        ('ful', '', 'Suffix: -ful (adjective from noun)'),
+
+        ('less', '', 'Suffix: -less (adjective from noun)'),
+
+        ('ed', '', 'Suffix: -ed (past tense)'),
+
+        ('ly', '', 'Suffix: -ly (adverb from adjective)'),
+
+        ('es', '', 'Suffix: -es (plural/3rd person)'),
+
+        ('s', '', 'Suffix: -s (plural/3rd person)')
+    ]
+
+    for suffix, restore, description in suffix_rules:
+
+        if word.endswith(suffix):
+
+            base = word[:-len(suffix)] + restore
+
+            analyses.append({
+                'word': word,
+                'base': base,
+                'operation': description,
+                'delete': suffix,
+                'add': restore or '--'
+            })
+
+    return analyses
+
+
+# ---------------------------------------------------------
+# Test Morphological Analysis
+# ---------------------------------------------------------
+
+test_words = [
+    'playing',
+    'unhappy',
+    'cities',
+    'watches',
+    'quickly',
+    'happiness',
+    'hopeless',
+    'exploration',
+    'jumped',
+    'cats'
+]
+
+print('\nMorphological Analysis Results')
+
+print('=' * 80)
+
+for word in test_words:
+
+    analyses = analyze_morphology(word)
+
+    print(f'\nWord: "{word}"')
+
+    for i, analysis in enumerate(analyses, 1):
+
+        print(f'  Analysis {i}:')
+
+        print(f'    Base form: {analysis["base"]}')
+
+        print(f'    Operation: {analysis["operation"]}')
+
+        print(f'    Removed: {analysis["delete"]}')
+
+        print(f'    Restored: {analysis["add"]}')
+
+
+# =========================================================
+# Step 6: Complete Add-Delete Table Summary
+# =========================================================
+
+print('\nComplete Add-Delete Table for English Morphology')
+
+print('=' * 100)
+
+print(
+    f'{"#":<4} '
+    f'{"Input":<12} '
+    f'{"Delete":<10} '
+    f'{"Add":<10} '
+    f'{"Output":<15} '
+    f'{"Morphological Process":<30}'
+)
+
+print('-' * 100)
+
+examples = [
+
+    ('play', '', 'ing', 'playing', 'Inflection: Progressive'),
+
+    ('make', 'e', 'ing', 'making', 'Inflection: Progressive (drop e)'),
+
+    ('play', '', 'ed', 'played', 'Inflection: Past tense'),
+
+    ('love', '', 'd', 'loved', 'Inflection: Past tense (-d)'),
+
+    ('play', '', 's', 'plays', 'Inflection: 3rd person'),
+
+    ('watch', '', 'es', 'watches', 'Inflection: 3rd person (+es)'),
+
+    ('cat', '', 's', 'cats', 'Inflection: Plural'),
+
+    ('box', '', 'es', 'boxes', 'Inflection: Plural (+es)'),
+
+    ('city', 'y', 'ies', 'cities', 'Inflection: Plural (y->ies)'),
+
+    ('happy', '', 'un', 'unhappy', 'Derivation: Negation'),
+
+    ('explore', 'e', 'ation', 'exploration', 'Derivation: Verb->Noun'),
+
+    ('happy', '', 'ness', 'happiness', 'Derivation: Adj->Noun'),
+
+    ('hope', '', 'ful', 'hopeful', 'Derivation: Noun->Adj'),
+
+    ('hope', '', 'less', 'hopeless', 'Derivation: Noun->Adj'),
+
+    ('quick', '', 'ly', 'quickly', 'Derivation: Adj->Adv')
+]
+
+for i, (inp, delete, add, output, process) in enumerate(examples, 1):
+
+    print(
+        f'{i:<4} '
+        f'{inp:<12} '
+        f'{delete or "-":<10} '
+        f'{add:<10} '
+        f'{output:<15} '
+        f'{process:<30}'
+    )
+
+
+# =========================================================
+# Conclusion
+# =========================================================
+
+print('\nMorphological analysis completed successfully!')

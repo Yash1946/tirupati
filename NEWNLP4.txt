@@ -1,0 +1,709 @@
+# =========================================================
+# Assignment 4
+# Transformer Model from Scratch using PyTorch
+# =========================================================
+
+
+# ---------------------------------------------------------
+# Step 1: Import Required Libraries
+# ---------------------------------------------------------
+
+# Import necessary libraries
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+import math
+import numpy as np
+
+# Set random seed for reproducibility
+torch.manual_seed(42)
+
+# Check device
+device = torch.device(
+    'cuda' if torch.cuda.is_available() else 'cpu'
+)
+
+print(f'Using device: {device}')
+
+print(f'PyTorch version: {torch.__version__}')
+
+
+# =========================================================
+# Step 2: Token Embedding Layer
+# =========================================================
+
+class TokenEmbedding(nn.Module):
+    """
+    Converts token indices into dense embedding vectors.
+    Scales embeddings by sqrt(d_model)
+    as described in the original paper.
+    """
+
+    def __init__(self, vocab_size, d_model):
+
+        super(TokenEmbedding, self).__init__()
+
+        self.embedding = nn.Embedding(
+            vocab_size,
+            d_model
+        )
+
+        self.d_model = d_model
+
+    def forward(self, x):
+
+        # Scale embedding by sqrt(d_model)
+        return self.embedding(x) * math.sqrt(self.d_model)
+
+
+# ---------------------------------------------------------
+# Test Embedding Layer
+# ---------------------------------------------------------
+
+vocab_size = 100
+
+d_model = 64
+
+embed = TokenEmbedding(vocab_size, d_model)
+
+# Create a sample input:
+# batch of 2 sentences,
+# each with 5 tokens
+
+sample_input = torch.randint(
+    0,
+    vocab_size,
+    (2, 5)
+)
+
+print(f'Input shape: {sample_input.shape}')
+
+print(f'Input tokens:\n{sample_input}')
+
+embedded = embed(sample_input)
+
+print(
+    f'\nEmbedding output shape: '
+    f'{embedded.shape}'
+)
+
+
+# =========================================================
+# Step 3: Positional Encoding
+# =========================================================
+
+class PositionalEncoding(nn.Module):
+
+    def __init__(
+        self,
+        d_model,
+        max_len=5000,
+        dropout=0.1
+    ):
+
+        super(PositionalEncoding, self).__init__()
+
+        self.dropout = nn.Dropout(dropout)
+
+        pe = torch.zeros(max_len, d_model)
+
+        position = torch.arange(
+            0,
+            max_len
+        ).unsqueeze(1)
+
+        div_term = torch.exp(
+            torch.arange(
+                0,
+                d_model,
+                2
+            ) * (-math.log(10000.0) / d_model)
+        )
+
+        pe[:, 0::2] = torch.sin(
+            position * div_term
+        )
+
+        pe[:, 1::2] = torch.cos(
+            position * div_term
+        )
+
+        pe = pe.unsqueeze(0)
+
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+
+        x = x + self.pe[:, :x.size(1)]
+
+        return self.dropout(x)
+
+
+# ---------------------------------------------------------
+# Test Positional Encoding
+# ---------------------------------------------------------
+
+pos_encoder = PositionalEncoding(d_model)
+
+x = torch.randn(2, 5, d_model)
+
+pos_output = pos_encoder(x)
+
+print(
+    f'Positional Encoding Output Shape: '
+    f'{pos_output.shape}'
+)
+
+
+# =========================================================
+# Step 4: Multi-Head Attention
+# =========================================================
+
+class MultiHeadAttention(nn.Module):
+
+    def __init__(self, d_model, num_heads):
+
+        super(MultiHeadAttention, self).__init__()
+
+        assert d_model % num_heads == 0
+
+        self.d_model = d_model
+
+        self.num_heads = num_heads
+
+        self.d_k = d_model // num_heads
+
+        # Linear layers
+        self.w_q = nn.Linear(d_model, d_model)
+
+        self.w_k = nn.Linear(d_model, d_model)
+
+        self.w_v = nn.Linear(d_model, d_model)
+
+        self.w_o = nn.Linear(d_model, d_model)
+
+    def scaled_dot_product_attention(
+        self,
+        Q,
+        K,
+        V,
+        mask=None
+    ):
+
+        scores = torch.matmul(
+            Q,
+            K.transpose(-2, -1)
+        ) / math.sqrt(self.d_k)
+
+        if mask is not None:
+
+            scores = scores.masked_fill(
+                mask == 0,
+                -1e9
+            )
+
+        attention_weights = F.softmax(
+            scores,
+            dim=-1
+        )
+
+        # Multiply with values
+        output = torch.matmul(
+            attention_weights,
+            V
+        )
+
+        return output, attention_weights
+
+    def forward(
+        self,
+        query,
+        key,
+        value,
+        mask=None
+    ):
+
+        batch_size = query.size(0)
+
+        # 1. Linear projections
+        Q = self.w_q(query)
+
+        K = self.w_k(key)
+
+        V = self.w_v(value)
+
+        # 2. Reshape for multi-head
+        Q = Q.view(
+            batch_size,
+            -1,
+            self.num_heads,
+            self.d_k
+        ).transpose(1, 2)
+
+        K = K.view(
+            batch_size,
+            -1,
+            self.num_heads,
+            self.d_k
+        ).transpose(1, 2)
+
+        V = V.view(
+            batch_size,
+            -1,
+            self.num_heads,
+            self.d_k
+        ).transpose(1, 2)
+
+        # 3. Apply attention
+        attn_output, attn_weights = (
+            self.scaled_dot_product_attention(
+                Q,
+                K,
+                V,
+                mask
+            )
+        )
+
+        # 4. Concatenate heads
+        attn_output = (
+            attn_output
+            .transpose(1, 2)
+            .contiguous()
+            .view(batch_size, -1, self.d_model)
+        )
+
+        # 5. Final linear projection
+        output = self.w_o(attn_output)
+
+        return output, attn_weights
+
+
+# ---------------------------------------------------------
+# Test Multi-Head Attention
+# ---------------------------------------------------------
+
+mha = MultiHeadAttention(
+    d_model=64,
+    num_heads=4
+)
+
+x = torch.randn(2, 5, 64)
+
+output, weights = mha(x, x, x)
+
+print(f'Input shape: {x.shape}')
+
+print(f'Output shape: {output.shape}')
+
+print(
+    f'Attention weights: '
+    f'{weights.shape}'
+)
+
+
+# =========================================================
+# Step 5: Feed-Forward Network
+# =========================================================
+
+class FeedForwardNetwork(nn.Module):
+    """
+    Position-wise Feed-Forward Network.
+    Two linear layers with ReLU activation
+    and dropout.
+    """
+
+    def __init__(
+        self,
+        d_model,
+        d_ff,
+        dropout=0.1
+    ):
+
+        super(FeedForwardNetwork, self).__init__()
+
+        self.linear1 = nn.Linear(d_model, d_ff)
+
+        self.linear2 = nn.Linear(d_ff, d_model)
+
+        self.dropout = nn.Dropout(dropout)
+
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+
+        # x: (batch_size, seq_len, d_model)
+
+        x = self.linear1(x)
+
+        # -> (batch, seq_len, d_ff)
+
+        x = self.relu(x)
+
+        x = self.dropout(x)
+
+        x = self.linear2(x)
+
+        # -> (batch, seq_len, d_model)
+
+        return x
+
+
+# ---------------------------------------------------------
+# Test Feed-Forward Network
+# ---------------------------------------------------------
+
+ffn = FeedForwardNetwork(
+    d_model=64,
+    d_ff=256
+)
+
+x = torch.randn(2, 5, 64)
+
+output = ffn(x)
+
+print(
+    f'FFN Output Shape: {output.shape}'
+)
+
+
+# =========================================================
+# Step 6: Transformer Encoder Block
+# =========================================================
+
+class TransformerEncoderBlock(nn.Module):
+
+    def __init__(
+        self,
+        d_model,
+        num_heads,
+        d_ff,
+        dropout=0.1
+    ):
+
+        super(
+            TransformerEncoderBlock,
+            self
+        ).__init__()
+
+        self.self_attention = MultiHeadAttention(
+            d_model,
+            num_heads
+        )
+
+        self.feed_forward = FeedForwardNetwork(
+            d_model,
+            d_ff,
+            dropout
+        )
+
+        self.norm1 = nn.LayerNorm(d_model)
+
+        self.norm2 = nn.LayerNorm(d_model)
+
+        # Dropout
+        self.dropout1 = nn.Dropout(dropout)
+
+        self.dropout2 = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None):
+
+        # 1. Multi-head self-attention
+        attn_output, attn_weights = (
+            self.self_attention(
+                x,
+                x,
+                x,
+                mask
+            )
+        )
+
+        x = self.norm1(
+            x + self.dropout1(attn_output)
+        )
+
+        # 2. Feed-forward with Residual Connection
+        ff_output = self.feed_forward(x)
+
+        x = self.norm2(
+            x + self.dropout2(ff_output)
+        )
+
+        return x, attn_weights
+
+
+# ---------------------------------------------------------
+# Test Encoder Block
+# ---------------------------------------------------------
+
+encoder_block = TransformerEncoderBlock(
+    d_model=64,
+    num_heads=4,
+    d_ff=256
+)
+
+x = torch.randn(2, 5, 64)
+
+output, weights = encoder_block(x)
+
+print(f'Encoder Block Input: {x.shape}')
+
+print(f'Encoder Block Output: {output.shape}')
+
+
+# =========================================================
+# Step 7: Assemble Full Transformer Model
+# =========================================================
+
+class TransformerModel(nn.Module):
+    """
+    Complete Transformer Encoder Model.
+
+    Combines:
+    Token Embedding +
+    Positional Encoding +
+    N Encoder Blocks +
+    Output Layer
+    """
+
+    def __init__(
+        self,
+        vocab_size,
+        d_model,
+        num_heads,
+        d_ff,
+        num_layers,
+        max_len=512,
+        num_classes=2,
+        dropout=0.1
+    ):
+
+        super(
+            TransformerModel,
+            self
+        ).__init__()
+
+        # Token Embedding
+        self.embedding = TokenEmbedding(
+            vocab_size,
+            d_model
+        )
+
+        # Positional Encoding
+        self.pos_encoding = PositionalEncoding(
+            d_model,
+            max_len,
+            dropout
+        )
+
+        # Stack of Encoder Blocks
+        self.encoder_blocks = nn.ModuleList([
+            TransformerEncoderBlock(
+                d_model,
+                num_heads,
+                d_ff,
+                dropout
+            )
+            for _ in range(num_layers)
+        ])
+
+        # Output classification layer
+        self.output_layer = nn.Linear(
+            d_model,
+            num_classes
+        )
+
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None):
+
+        # 1. Embedding + Positional Encoding
+        x = self.embedding(x)
+
+        x = self.pos_encoding(x)
+
+        # 2. Pass through encoder blocks
+        all_attention_weights = []
+
+        for encoder in self.encoder_blocks:
+
+            x, attn_weights = encoder(x, mask)
+
+            all_attention_weights.append(
+                attn_weights
+            )
+
+        # 3. Global average pooling
+        # (aggregate sequence)
+
+        x = x.mean(dim=1)
+
+        # 4. Classification
+        output = self.output_layer(
+            self.dropout(x)
+        )
+
+        return output, all_attention_weights
+
+
+# ---------------------------------------------------------
+# Model Hyperparameters
+# ---------------------------------------------------------
+
+VOCAB_SIZE = 1000
+
+D_MODEL = 64
+
+NUM_HEADS = 4
+
+D_FF = 256
+
+NUM_LAYERS = 2
+
+NUM_CLASSES = 2
+
+# Create model
+model = TransformerModel(
+    vocab_size=VOCAB_SIZE,
+    d_model=D_MODEL,
+    num_heads=NUM_HEADS,
+    d_ff=D_FF,
+    num_layers=NUM_LAYERS,
+    num_classes=NUM_CLASSES
+)
+
+print('\nTransformer Model Architecture:')
+
+print('=' * 50)
+
+print(model)
+
+print(
+    f'\nTotal parameters: '
+    f'{sum(p.numel() for p in model.parameters()):,}'
+)
+
+
+# =========================================================
+# Step 8: Test with Dummy Data
+# =========================================================
+
+# Create dummy data
+
+batch_size = 4
+
+seq_length = 10
+
+# Random token indices
+# (simulating tokenized text)
+
+dummy_input = torch.randint(
+    0,
+    VOCAB_SIZE,
+    (batch_size, seq_length)
+)
+
+dummy_labels = torch.randint(
+    0,
+    NUM_CLASSES,
+    (batch_size,)
+)
+
+print(f'Dummy input shape: {dummy_input.shape}')
+
+print(f'Dummy labels shape: {dummy_labels.shape}')
+
+print(
+    f'\nSample input '
+    f'(first sequence): '
+    f'{dummy_input[0].tolist()}'
+)
+
+print(
+    f'Sample labels: '
+    f'{dummy_labels.tolist()}'
+)
+
+
+# ---------------------------------------------------------
+# Forward Pass
+# ---------------------------------------------------------
+
+model.eval()
+
+# Set to evaluation mode
+
+with torch.no_grad():
+
+    output, attention_weights = model(dummy_input)
+
+print(f'\nModel output shape: {output.shape}')
+
+print(f'Raw output (logits):\n{output}')
+
+# Apply softmax to get probabilities
+probs = F.softmax(output, dim=1)
+
+print(f'\nPrediction probabilities:\n{probs}')
+
+# Get predicted classes
+predictions = torch.argmax(probs, dim=1)
+
+print(
+    f'\nPredicted classes: '
+    f'{predictions.tolist()}'
+)
+
+print(
+    f'Actual labels: '
+    f'{dummy_labels.tolist()}'
+)
+
+
+# =========================================================
+# Quick Training Loop Demonstration
+# =========================================================
+
+print('\nQuick Training Demo (5 epochs):')
+
+print('-' * 40)
+
+model.train()
+
+optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=0.001
+)
+
+criterion = nn.CrossEntropyLoss()
+
+for epoch in range(5):
+
+    optimizer.zero_grad()
+
+    output, _ = model(dummy_input)
+
+    loss = criterion(output, dummy_labels)
+
+    loss.backward()
+
+    optimizer.step()
+
+    # Calculate accuracy
+    preds = torch.argmax(output, dim=1)
+
+    accuracy = (
+        (preds == dummy_labels)
+        .float()
+        .mean()
+        .item()
+    )
+
+    print(
+        f'Epoch {epoch+1}/5 '
+        f'- Loss: {loss.item():.4f}, '
+        f'Accuracy: {accuracy:.2%}'
+    )
+
+print('\nTraining complete!')

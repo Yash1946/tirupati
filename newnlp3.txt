@@ -1,0 +1,481 @@
+# =========================================================
+# NLP Assignment
+# Text Cleaning, Stopword Removal,
+# Lemmatization, Label Encoding, TF-IDF
+# =========================================================
+
+
+# ---------------------------------------------------------
+# Step 1: Import Required Libraries
+# ---------------------------------------------------------
+
+# Import necessary libraries
+
+import os
+import re
+import string
+import numpy as np
+import pandas as pd
+import nltk
+
+# Download required NLTK data
+nltk.download('movie_reviews')
+nltk.download('punkt')
+nltk.download('punkt_tab')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+from nltk.corpus import movie_reviews, stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import LabelEncoder
+
+print('All libraries imported successfully!')
+
+
+# ---------------------------------------------------------
+# Step 2: Load and Prepare Dataset
+# ---------------------------------------------------------
+
+# Create Data folder
+os.makedirs('Data', exist_ok=True)
+
+# Load NLTK Movie Reviews dataset
+# This dataset has 2000 movie reviews labeled as
+# 'pos' (positive) or 'neg' (negative)
+
+documents = []
+labels = []
+
+for category in movie_reviews.categories():
+
+    for fileid in movie_reviews.fileids(category):
+
+        text = movie_reviews.raw(fileid)
+
+        documents.append(text)
+
+        labels.append(category)
+
+# Create DataFrame
+df = pd.DataFrame({
+    'text': documents,
+    'label': labels
+})
+
+# Save raw dataset
+df.to_csv(
+    'Data/movie_reviews_raw.csv',
+    index=False
+)
+
+print(f'Dataset loaded: {len(df)} reviews')
+
+print(f'\nLabel distribution:')
+
+print(df['label'].value_counts())
+
+print('\nSample review (first 200 chars):')
+
+print(df['text'].iloc[0][:200] + '...')
+
+
+# ---------------------------------------------------------
+# Use subset for faster processing
+# ---------------------------------------------------------
+
+# For faster processing, let's use a subset of 200 reviews
+
+df_sample = df.sample(
+    n=200,
+    random_state=42
+).reset_index(drop=True)
+
+print(
+    f'\nWorking with subset of '
+    f'{len(df_sample)} reviews'
+)
+
+print('Label distribution in subset:')
+
+print(df_sample['label'].value_counts())
+
+
+# =========================================================
+# Step 3: Text Cleaning
+# =========================================================
+
+def clean_text(text):
+    """
+    Clean text by removing noise.
+    """
+
+    # Step 1: Convert to lowercase
+    text = text.lower()
+
+    # Step 2: Remove HTML tags (if any)
+    text = re.sub(r'<[^>]+>', '', text)
+
+    # Step 3: Remove URLs
+    text = re.sub(r'http\S+|www\S+', '', text)
+
+    # Step 4: Remove special characters,
+    # numbers, and punctuation
+
+    text = re.sub(r'[^a-zA-Z\s]', '', text)
+
+    # Step 5: Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+
+    return text
+
+
+# Apply text cleaning
+df_sample['cleaned_text'] = (
+    df_sample['text'].apply(clean_text)
+)
+
+# Show before and after
+print('\n=== Before Cleaning ===')
+
+print(df_sample['text'].iloc[0][:200])
+
+print('\n=== After Cleaning ===')
+
+print(df_sample['cleaned_text'].iloc[0][:200])
+
+
+# =========================================================
+# Step 4: Remove Stopwords
+# =========================================================
+
+# Get English stopwords
+stop_words = set(stopwords.words('english'))
+
+print(f'Total stopwords: {len(stop_words)}')
+
+print(
+    f'Sample stopwords: '
+    f'{list(stop_words)[:20]}'
+)
+
+def remove_stopwords(text):
+    """Remove stopwords from text."""
+
+    words = text.split()
+
+    filtered_words = [
+        w for w in words
+        if w not in stop_words
+    ]
+
+    return ' '.join(filtered_words)
+
+
+# Apply stopword removal
+df_sample['no_stopwords'] = (
+    df_sample['cleaned_text'].apply(
+        remove_stopwords
+    )
+)
+
+# Show effect
+print('\n=== Before Stopword Removal ===')
+
+print(df_sample['cleaned_text'].iloc[0][:200])
+
+print('\n=== After Stopword Removal ===')
+
+print(df_sample['no_stopwords'].iloc[0][:200])
+
+print()
+
+# Count reduction in words
+before_count = len(
+    df_sample['cleaned_text'].iloc[0].split()
+)
+
+after_count = len(
+    df_sample['no_stopwords'].iloc[0].split()
+)
+
+print(
+    f'Words before: {before_count}, '
+    f'after: {after_count}, '
+    f'removed: {before_count - after_count}'
+)
+
+
+# =========================================================
+# Step 5: Lemmatization
+# =========================================================
+
+# Initialize lemmatizer
+lemmatizer = WordNetLemmatizer()
+
+def lemmatize_text(text):
+    """Lemmatize all words in text."""
+
+    words = text.split()
+
+    lemmatized_words = [
+        lemmatizer.lemmatize(w, pos='v')
+        for w in words
+    ]
+
+    return ' '.join(lemmatized_words)
+
+
+# Apply lemmatization
+df_sample['lemmatized'] = (
+    df_sample['no_stopwords'].apply(
+        lemmatize_text
+    )
+)
+
+# Show effect
+print('\n=== Before Lemmatization ===')
+
+print(df_sample['no_stopwords'].iloc[0][:200])
+
+print('\n=== After Lemmatization ===')
+
+print(df_sample['lemmatized'].iloc[0][:200])
+
+
+# =========================================================
+# Step 6: Label Encoding
+# =========================================================
+
+# Label Encoding
+label_encoder = LabelEncoder()
+
+df_sample['label_encoded'] = (
+    label_encoder.fit_transform(
+        df_sample['label']
+    )
+)
+
+print('\nLabel Encoding Mapping:')
+
+for i, cls in enumerate(label_encoder.classes_):
+
+    print(f'{cls} -> {i}')
+
+print('\nEncoded label distribution:')
+
+print(df_sample['label_encoded'].value_counts())
+
+print()
+
+print(
+    df_sample[
+        ['label', 'label_encoded']
+    ].head(10)
+)
+
+
+# =========================================================
+# Step 7: TF-IDF Representation
+# =========================================================
+
+# Create TF-IDF representation
+
+tfidf_vectorizer = TfidfVectorizer(
+    max_features=500
+)
+
+# Fit and transform on lemmatized text
+tfidf_matrix = tfidf_vectorizer.fit_transform(
+    df_sample['lemmatized']
+)
+
+# Get feature names
+feature_names = (
+    tfidf_vectorizer.get_feature_names_out()
+)
+
+print(
+    f'\nTF-IDF Matrix Shape: '
+    f'{tfidf_matrix.shape}'
+)
+
+print(
+    f'(i.e., '
+    f'{tfidf_matrix.shape[0]} documents '
+    f'x '
+    f'{tfidf_matrix.shape[1]} features)'
+)
+
+print('\nTop 20 features (words):')
+
+print(list(feature_names[:20]))
+
+
+# ---------------------------------------------------------
+# Convert TF-IDF to DataFrame
+# ---------------------------------------------------------
+
+# Convert TF-IDF to DataFrame for inspection
+
+tfidf_df = pd.DataFrame(
+    tfidf_matrix.toarray(),
+    columns=feature_names
+)
+
+# Show first 5 documents with first 10 features
+print(
+    '\nTF-IDF Matrix '
+    '(first 5 docs, first 10 features):'
+)
+
+print(tfidf_df.iloc[:5, :10])
+
+
+# =========================================================
+# Step 8: Save Outputs
+# =========================================================
+
+# Save processed data to CSV
+
+# 1. Cleaned text with labels
+processed_df = df_sample[
+    [
+        'text',
+        'cleaned_text',
+        'no_stopwords',
+        'lemmatized',
+        'label',
+        'label_encoded'
+    ]
+]
+
+processed_df.to_csv(
+    'Data/processed_reviews.csv',
+    index=False
+)
+
+print(
+    'Saved: '
+    'Data/processed_reviews.csv'
+)
+
+# 2. TF-IDF matrix
+tfidf_output = pd.DataFrame(
+    tfidf_matrix.toarray(),
+    columns=feature_names
+)
+
+tfidf_output.insert(
+    0,
+    'label',
+    df_sample['label_encoded'].values
+)
+
+tfidf_output.to_csv(
+    'Data/tfidf_features.csv',
+    index=False
+)
+
+print('Saved: Data/tfidf_features.csv')
+
+
+# ---------------------------------------------------------
+# Summary statistics
+# ---------------------------------------------------------
+
+# 3. Summary statistics with open(
+# 'Data/pipeline_summary.txt', 'w'
+# ) as f:
+
+with open(
+    'Data/pipeline_summary.txt',
+    'w'
+) as f:
+
+    f.write(
+        'Text Cleaning & TF-IDF Pipeline Summary\n'
+    )
+
+    f.write('=' * 45 + '\n\n')
+
+    f.write(
+        f'Total documents: '
+        f'{len(df_sample)}\n'
+    )
+
+    f.write(
+        f'Positive reviews: '
+        f'{(df_sample["label"] == "pos").sum()}\n'
+    )
+
+    f.write(
+        f'Negative reviews: '
+        f'{(df_sample["label"] == "neg").sum()}\n'
+    )
+
+    f.write(
+        f'TF-IDF features: '
+        f'{tfidf_matrix.shape[1]}\n'
+    )
+
+    f.write('\nProcessing steps:\n')
+
+    f.write(
+        '1. Text cleaning '
+        '(lowercase, remove punctuation/special chars)\n'
+    )
+
+    f.write(
+        '2. Stopword removal '
+        '(198 stopwords)\n'
+    )
+
+    f.write(
+        '3. Lemmatization '
+        '(WordNetLemmatizer)\n'
+    )
+
+    f.write(
+        '4. Label encoding '
+        '(neg=0, pos=1)\n'
+    )
+
+    f.write(
+        '5. TF-IDF vectorization '
+        '(max 500 features)\n'
+    )
+
+
+# =========================================================
+# Step 9: Verify Saved Files
+# =========================================================
+
+# Verify all saved files
+
+print('\nFiles in Data folder:')
+
+for f in os.listdir('Data'):
+
+    filepath = os.path.join('Data', f)
+
+    size = os.path.getsize(filepath)
+
+    print(f'  {f} ({size:,} bytes)')
+
+
+# ---------------------------------------------------------
+# Load and display summary
+# ---------------------------------------------------------
+
+print('\n' + '=' * 45)
+
+with open(
+    'Data/pipeline_summary.txt',
+    'r'
+) as f:
+
+    print(f.read())

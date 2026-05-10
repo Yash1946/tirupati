@@ -1,0 +1,319 @@
+# =========================================================
+# ASSIGNMENT 4
+# Create a Transformer from Scratch using PyTorch
+# =========================================================
+
+# =========================================================
+# STEP 1: Import Required Libraries
+# =========================================================
+!pip install torch
+import torch
+import torch.nn as nn
+import math
+# =========================================================
+# STEP 2: Define Input Parameters
+# =========================================================
+
+# Vocabulary size
+vocab_size = 1000
+
+# Embedding dimension
+d_model = 128
+
+# Number of attention heads
+num_heads = 8
+
+# Number of encoder layers
+num_layers = 2
+
+# Feed Forward dimension
+ffn_hidden = 512
+
+# Maximum sequence length
+max_seq_length = 50
+
+# Dropout rate
+dropout = 0.1
+# =========================================================
+# STEP 3: Positional Encoding
+# =========================================================
+
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model, max_seq_length):
+
+        super(PositionalEncoding, self).__init__()
+
+        pe = torch.zeros(max_seq_length, d_model)
+
+        position = torch.arange(
+            0,
+            max_seq_length,
+            dtype=torch.float
+        ).unsqueeze(1)
+
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2).float()
+            * (-math.log(10000.0) / d_model)
+        )
+
+        pe[:, 0::2] = torch.sin(position * div_term)
+
+        pe[:, 1::2] = torch.cos(position * div_term)
+
+        pe = pe.unsqueeze(0)
+
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+
+        x = x + self.pe[:, :x.size(1)]
+
+        return x
+# =========================================================
+# STEP 4: Multi-Head Attention
+# =========================================================
+
+class MultiHeadAttention(nn.Module):
+
+    def __init__(self, d_model, num_heads):
+
+        super(MultiHeadAttention, self).__init__()
+
+        self.num_heads = num_heads
+        self.d_model = d_model
+
+        self.head_dim = d_model // num_heads
+
+        self.query = nn.Linear(d_model, d_model)
+        self.key = nn.Linear(d_model, d_model)
+        self.value = nn.Linear(d_model, d_model)
+
+        self.fc_out = nn.Linear(d_model, d_model)
+
+    def scaled_dot_product_attention(self, Q, K, V):
+
+        attention_scores = torch.matmul(
+            Q,
+            K.transpose(-2, -1)
+        ) / math.sqrt(self.head_dim)
+
+        attention_weights = torch.softmax(
+            attention_scores,
+            dim=-1
+        )
+
+        output = torch.matmul(attention_weights, V)
+
+        return output
+
+    def forward(self, query, key, value):
+
+        batch_size = query.shape[0]
+
+        Q = self.query(query)
+        K = self.key(key)
+        V = self.value(value)
+
+        Q = Q.view(
+            batch_size,
+            -1,
+            self.num_heads,
+            self.head_dim
+        ).transpose(1, 2)
+
+        K = K.view(
+            batch_size,
+            -1,
+            self.num_heads,
+            self.head_dim
+        ).transpose(1, 2)
+
+        V = V.view(
+            batch_size,
+            -1,
+            self.num_heads,
+            self.head_dim
+        ).transpose(1, 2)
+
+        attention_output = self.scaled_dot_product_attention(
+            Q,
+            K,
+            V
+        )
+
+        attention_output = attention_output.transpose(
+            1,
+            2
+        ).contiguous().view(
+            batch_size,
+            -1,
+            self.d_model
+        )
+
+        output = self.fc_out(attention_output)
+
+        return output
+# =========================================================
+# STEP 5: Feed Forward Network
+# =========================================================
+
+class FeedForward(nn.Module):
+
+    def __init__(self, d_model, hidden_dim):
+
+        super(FeedForward, self).__init__()
+
+        self.fc1 = nn.Linear(d_model, hidden_dim)
+
+        self.relu = nn.ReLU()
+
+        self.fc2 = nn.Linear(hidden_dim, d_model)
+
+    def forward(self, x):
+
+        return self.fc2(self.relu(self.fc1(x)))
+
+# =========================================================
+# STEP 6: Transformer Encoder Layer
+# =========================================================
+
+class EncoderLayer(nn.Module):
+
+    def __init__(self, d_model, num_heads, hidden_dim, dropout):
+
+        super(EncoderLayer, self).__init__()
+
+        self.attention = MultiHeadAttention(
+            d_model,
+            num_heads
+        )
+
+        self.norm1 = nn.LayerNorm(d_model)
+
+        self.feed_forward = FeedForward(
+            d_model,
+            hidden_dim
+        )
+
+        self.norm2 = nn.LayerNorm(d_model)
+
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+
+        attention_output = self.attention(x, x, x)
+
+        x = self.norm1(
+            x + self.dropout(attention_output)
+        )
+
+        ff_output = self.feed_forward(x)
+
+        x = self.norm2(
+            x + self.dropout(ff_output)
+        )
+
+        return x
+# =========================================================
+# STEP 7: Transformer Model
+# =========================================================
+
+class Transformer(nn.Module):
+
+    def __init__(
+        self,
+        vocab_size,
+        d_model,
+        num_heads,
+        num_layers,
+        hidden_dim,
+        max_seq_length,
+        dropout
+    ):
+
+        super(Transformer, self).__init__()
+
+        self.embedding = nn.Embedding(
+            vocab_size,
+            d_model
+        )
+
+        self.positional_encoding = PositionalEncoding(
+            d_model,
+            max_seq_length
+        )
+
+        self.layers = nn.ModuleList([
+            EncoderLayer(
+                d_model,
+                num_heads,
+                hidden_dim,
+                dropout
+            )
+            for _ in range(num_layers)
+        ])
+
+        self.fc_out = nn.Linear(
+            d_model,
+            vocab_size
+        )
+
+    def forward(self, x):
+
+        x = self.embedding(x)
+
+        x = self.positional_encoding(x)
+
+        for layer in self.layers:
+            x = layer(x)
+
+        output = self.fc_out(x)
+
+        return output
+# =========================================================
+# STEP 8: Create Transformer Model
+# =========================================================
+
+model = Transformer(
+    vocab_size=vocab_size,
+    d_model=d_model,
+    num_heads=num_heads,
+    num_layers=num_layers,
+    hidden_dim=ffn_hidden,
+    max_seq_length=max_seq_length,
+    dropout=dropout
+)
+
+print("\n==============================")
+print("Transformer Model")
+print("==============================")
+
+print(model)
+
+# =========================================================
+# STEP 9: Test the Model
+# =========================================================
+
+# Create random input tensor
+sample_input = torch.randint(
+    0,
+    vocab_size,
+    (2, 10)
+)
+
+print("\n==============================")
+print("Sample Input Shape")
+print("==============================")
+
+print(sample_input.shape)
+
+# Forward pass
+output = model(sample_input)
+
+print("\n==============================")
+print("Output Shape")
+print("==============================")
+
+print(output.shape)
+

@@ -1,0 +1,177 @@
+import nltk
+
+# Download required NLTK resources
+nltk.download('punkt')
+nltk.download('punkt_tab')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+
+from nltk.tokenize import (
+    WhitespaceTokenizer,
+    WordPunctTokenizer,
+    TreebankWordTokenizer,
+    TweetTokenizer,
+    MWETokenizer,
+    word_tokenize
+)
+
+from nltk.stem import PorterStemmer
+from nltk.stem import SnowballStemmer
+from nltk.stem import WordNetLemmatizer
+
+
+# =========================================================
+# STEP 2: Define Sample Text
+# =========================================================
+
+sample_text = """
+Natural Language Processing (NLP) is a sub-field of Artificial Intelligence.
+It's used in applications like chatbots, machine translation, and sentiment analysis.
+I can't believe it's already 2024! @NLP_lover shared a post #NLPisFun :)
+"""
+
+print("\n================ SAMPLE TEXT ================\n")
+print(sample_text)
+
+
+# =========================================================
+# STEP 3: TOKENIZATION
+# =========================================================
+
+# ---------------------------------------------------------
+# 3.1 Whitespace Tokenization
+# ---------------------------------------------------------
+
+print("\n==============================")
+print("1. Whitespace Tokenization")
+print("==============================")
+
+ws_tokenizer = WhitespaceTokenizer()
+ws_tokens = ws_tokenizer.tokenize(sample_text)
+
+print(ws_tokens)
+
+
+# ---------------------------------------------------------
+# 3.2 Punctuation-Based Tokenization
+# ---------------------------------------------------------
+
+print("\n==============================")
+print("2. Punctuation-Based Tokenization")
+print("==============================")
+
+wp_tokenizer = WordPunctTokenizer()
+
+wp_tokens = wp_tokenizer.tokenize(sample_text)
+
+print(wp_tokens)
+
+
+# ---------------------------------------------------------
+# 3.3 Treebank Tokenization
+# ---------------------------------------------------------
+
+print("\n==============================")
+print("3. Treebank Tokenization")
+print("==============================")
+
+tb_tokenizer = TreebankWordTokenizer()
+
+tb_tokens = tb_tokenizer.tokenize(sample_text)
+
+print(tb_tokens)
+
+
+# ---------------------------------------------------------
+# 3.4 Tweet Tokenization
+# ---------------------------------------------------------
+
+print("\n==============================")
+print("4. Tweet Tokenization")
+print("==============================")
+
+tweet_tokenizer = TweetTokenizer()
+
+tweet_tokens = tweet_tokenizer.tokenize(sample_text)
+
+print(tweet_tokens)
+
+
+# ---------------------------------------------------------
+# 3.5 Multi-Word Expression (MWE) Tokenization
+# ---------------------------------------------------------
+
+print("\n==============================")
+print("5. MWE Tokenization")
+print("==============================")
+
+mwe_tokenizer = MWETokenizer([
+    ('Natural', 'Language', 'Processing'),
+    ('Artificial', 'Intelligence'),
+    ('machine', 'translation'),
+    ('sentiment', 'analysis')
+], separator='_')
+
+base_tokens = word_tokenize(sample_text)
+
+mwe_tokens = mwe_tokenizer.tokenize(base_tokens)
+
+print(mwe_tokens)
+
+
+# =========================================================
+# STEP 4: STEMMING
+# =========================================================
+
+words = [
+    "running",
+    "playing",
+    "studies",
+    "easily",
+    "fairly",
+    "connected",
+    "machines"
+]
+
+
+# ---------------------------------------------------------
+# 4.1 Porter Stemmer
+# ---------------------------------------------------------
+
+print("\n==============================")
+print("6. Porter Stemming")
+print("==============================")
+
+porter = PorterStemmer()
+
+for word in words:
+    print(word, "->", porter.stem(word))
+
+
+# ---------------------------------------------------------
+# 4.2 Snowball Stemmer
+# ---------------------------------------------------------
+
+print("\n==============================")
+print("7. Snowball Stemming")
+print("==============================")
+
+snowball = SnowballStemmer("english")
+
+for word in words:
+    print(word, "->", snowball.stem(word))
+
+
+# =========================================================
+# STEP 5: LEMMATIZATION
+# =========================================================
+
+print("\n==============================")
+print("8. Lemmatization")
+print("==============================")
+
+lemmatizer = WordNetLemmatizer()
+
+for word in words:
+    print(word, "->", lemmatizer.lemmatize(word, pos='v'))

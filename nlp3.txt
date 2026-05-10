@@ -1,0 +1,172 @@
+# =========================================================
+# ASSIGNMENT 3
+# Text Cleaning, Lemmatization, Stopword Removal,
+# Label Encoding and TF-IDF Representation
+# =========================================================
+
+# =========================================================
+# STEP 1: Import Required Libraries
+# =========================================================
+
+import pandas as pd
+import re
+
+import nltk
+
+# Download required NLTK resources
+nltk.download('punkt')
+nltk.download('punkt_tab')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_extraction.text import TfidfVectorizer
+# =========================================================
+# STEP 2: Create Dataset
+# =========================================================
+
+data = {
+    "Text": [
+
+        "I love Natural Language Processing.",
+        "Machine learning is very interesting.",
+        "Deep learning improves AI applications.",
+        "NLP helps computers understand human language.",
+        "Text analytics is useful in business.",
+        "Artificial Intelligence is transforming industries.",
+        "Chatbots are becoming more intelligent.",
+        "Python is widely used in data science.",
+        "This movie was absolutely fantastic.",
+        "The product quality is very poor.",
+        "I am happy with the service.",
+        "The food tasted terrible.",
+        "The weather is normal today.",
+        "Customer support solved my issue quickly.",
+        "The exam was difficult but manageable."
+
+    ],
+
+    "Category": [
+
+        "Positive",
+        "Positive",
+        "Positive",
+        "Positive",
+        "Neutral",
+        "Neutral",
+        "Neutral",
+        "Neutral",
+        "Positive",
+        "Negative",
+        "Positive",
+        "Negative",
+        "Neutral",
+        "Positive",
+        "Neutral"
+
+    ]
+}
+
+df = pd.DataFrame(data)
+
+print("\n==============================")
+print("Original Dataset")
+print("==============================")
+
+print(df)
+# =========================================================
+# STEP 3: TEXT CLEANING
+# =========================================================
+
+print("\n==============================")
+print("Text Cleaning")
+print("==============================")
+
+# Initialize stopwords and lemmatizer
+stop_words = set(stopwords.words('english'))
+
+lemmatizer = WordNetLemmatizer()
+
+
+# Function for preprocessing text
+def preprocess_text(text):
+
+    # Convert to lowercase
+    text = text.lower()
+
+    # Remove punctuation and numbers
+    text = re.sub(r'[^a-zA-Z\s]', '', text)
+
+    # Tokenization
+    tokens = word_tokenize(text)
+
+    # Remove stopwords
+    tokens = [word for word in tokens if word not in stop_words]
+
+    # Lemmatization
+    tokens = [lemmatizer.lemmatize(word) for word in tokens]
+
+    # Join words back into sentence
+    cleaned_text = " ".join(tokens)
+
+    return cleaned_text
+
+
+# Apply preprocessing
+df["Cleaned_Text"] = df["Text"].apply(preprocess_text)
+
+print(df[["Text", "Cleaned_Text"]])
+
+# =========================================================
+# STEP 4: LABEL ENCODING
+# =========================================================
+
+print("\n==============================")
+print("Label Encoding")
+print("==============================")
+
+label_encoder = LabelEncoder()
+
+df["Encoded_Label"] = label_encoder.fit_transform(df["Category"])
+
+print(df[["Category", "Encoded_Label"]])
+# =========================================================
+# STEP 5: TF-IDF REPRESENTATION
+# =========================================================
+
+print("\n==============================")
+print("TF-IDF Representation")
+print("==============================")
+
+tfidf_vectorizer = TfidfVectorizer()
+
+tfidf_matrix = tfidf_vectorizer.fit_transform(df["Cleaned_Text"])
+
+tfidf_df = pd.DataFrame(
+    tfidf_matrix.toarray(),
+    columns=tfidf_vectorizer.get_feature_names_out()
+)
+
+print(tfidf_df)
+
+# =========================================================
+# STEP 6: SAVE OUTPUTS
+# =========================================================
+
+print("\n==============================")
+print("Saving Outputs")
+print("==============================")
+
+# Save processed dataset
+df.to_csv("processed_text_data.csv", index=False)
+
+# Save TF-IDF representation
+tfidf_df.to_csv("tfidf_output.csv", index=False)
+
+print("Processed dataset saved as: processed_text_data.csv")
+print("TF-IDF output saved as: tfidf_output.csv")

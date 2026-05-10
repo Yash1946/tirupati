@@ -1,0 +1,303 @@
+# =========================================================
+# Assignment 1 - NLP Basics
+# Tokenization, Stemming, Lemmatization
+# =========================================================
+
+
+# ---------------------------------------------------------
+# Step 1: Import Required Libraries
+# ---------------------------------------------------------
+
+# Import necessary libraries
+import nltk
+
+# Download required NLTK data
+nltk.download('punkt')
+nltk.download('punkt_tab')
+nltk.download('wordnet')
+nltk.download('averaged_perceptron_tagger')
+nltk.download('omw-1.4')
+
+from nltk.tokenize import (
+    word_tokenize,
+    WhitespaceTokenizer,
+    WordPunctTokenizer,
+    TreebankWordTokenizer,
+    TweetTokenizer,
+    MWETokenizer
+)
+
+from nltk.stem import PorterStemmer, SnowballStemmer
+from nltk.stem import WordNetLemmatizer
+
+print("All libraries imported successfully!")
+
+
+# ---------------------------------------------------------
+# Step 2: Define Sample Text
+# ---------------------------------------------------------
+
+# Sample sentences for tokenization
+sample_text = """
+Natural Language Processing (NLP) is a sub-field of Artificial Intelligence.
+It's used in applications like chatbots, machine translation, and sentiment analysis.
+I can't believe it's already 2024! @NLP_lover shared a post #NLPisFun :)
+"""
+
+print("Sample Text:")
+print(sample_text)
+
+
+# =========================================================
+# Step 3: Tokenization
+# =========================================================
+
+# ---------------------------------------------------------
+# 3.1 Whitespace Tokenizer
+# ---------------------------------------------------------
+
+# Whitespace Tokenizer — splits text on whitespace characters
+ws_tokenizer = WhitespaceTokenizer()
+
+ws_tokens = ws_tokenizer.tokenize(sample_text)
+
+print('\nWhitespace Tokenizer Output:')
+print(ws_tokens)
+
+print(f'\nNumber of tokens: {len(ws_tokens)}')
+
+
+# ---------------------------------------------------------
+# 3.2 Punctuation-Based Tokenizer
+# ---------------------------------------------------------
+
+# WordPunct Tokenizer — splits on both whitespace and punctuation
+wp_tokenizer = WordPunctTokenizer()
+
+wp_tokens = wp_tokenizer.tokenize(sample_text)
+
+print('\nPunctuation-Based (WordPunct) Tokenizer Output:')
+print(wp_tokens)
+
+print(f'\nNumber of tokens: {len(wp_tokens)}')
+
+
+# ---------------------------------------------------------
+# 3.3 Treebank Word Tokenizer
+# ---------------------------------------------------------
+
+# Treebank Word Tokenizer — uses Penn Treebank conventions
+# Handles contractions like "can't" -> ["ca", "n't"]
+
+tb_tokenizer = TreebankWordTokenizer()
+
+tb_tokens = tb_tokenizer.tokenize(sample_text)
+
+print('\nTreebank Word Tokenizer Output:')
+print(tb_tokens)
+
+print(f'\nNumber of tokens: {len(tb_tokens)}')
+
+
+# ---------------------------------------------------------
+# 3.4 Tweet Tokenizer
+# ---------------------------------------------------------
+
+# Tweet Tokenizer — designed for social media text
+# Preserves hashtags, mentions, emoticons
+
+tweet_tokenizer = TweetTokenizer(
+    preserve_case=False,
+    strip_handles=False
+)
+
+tweet_tokens = tweet_tokenizer.tokenize(sample_text)
+
+print('\nTweet Tokenizer Output:')
+print(tweet_tokens)
+
+print(f'\nNumber of tokens: {len(tweet_tokens)}')
+
+
+# ---------------------------------------------------------
+# 3.5 Multi-Word Expression (MWE) Tokenizer
+# ---------------------------------------------------------
+
+# MWE Tokenizer — groups multi-word expressions into single tokens
+
+mwe_tokenizer = MWETokenizer([
+    ('Natural', 'Language', 'Processing'),
+    ('Artificial', 'Intelligence'),
+    ('sentiment', 'analysis'),
+    ('machine', 'translation')
+], separator='_')
+
+# Apply on word_tokenize output
+base_tokens = word_tokenize(sample_text)
+
+mwe_tokens = mwe_tokenizer.tokenize(base_tokens)
+
+print('\nMWE Tokenizer Output:')
+print(mwe_tokens)
+
+print(f'\nNumber of tokens: {len(mwe_tokens)}')
+
+
+# =========================================================
+# Step 4: Stemming
+# =========================================================
+
+# ---------------------------------------------------------
+# 4.1 Porter Stemmer
+# ---------------------------------------------------------
+
+# Porter Stemmer — one of the oldest and most commonly used stemmers
+
+porter = PorterStemmer()
+
+# Words to stem
+words = [
+    'running',
+    'runs',
+    'runner',
+    'happily',
+    'happiness',
+    'playing',
+    'played',
+    'plays',
+    'player',
+    'connection',
+    'connected',
+    'connecting',
+    'studies',
+    'studying'
+]
+
+print('\nPorter Stemmer Results:')
+print('-' * 35)
+
+print(f'{"Original":<15} {"Stemmed":<15}')
+
+print('-' * 35)
+
+for word in words:
+    print(f'{word:<15} {porter.stem(word):<15}')
+
+
+# ---------------------------------------------------------
+# 4.2 Snowball Stemmer
+# ---------------------------------------------------------
+
+# Snowball Stemmer — an improved version of Porter Stemmer
+# Also known as Porter2 Stemmer
+
+snowball = SnowballStemmer('english')
+
+print('\nSnowball Stemmer Results:')
+print('-' * 35)
+
+print(f'{"Original":<15} {"Stemmed":<15}')
+
+print('-' * 35)
+
+for word in words:
+    print(f'{word:<15} {snowball.stem(word):<15}')
+
+
+# ---------------------------------------------------------
+# Side-by-side comparison
+# ---------------------------------------------------------
+
+print('\nComparison: Porter vs Snowball Stemmer')
+
+print('-' * 50)
+
+print(f'{"Original":<15} {"Porter":<15} {"Snowball":<15}')
+
+print('-' * 50)
+
+for word in words:
+    print(
+        f'{word:<15} '
+        f'{porter.stem(word):<15} '
+        f'{snowball.stem(word):<15}'
+    )
+
+
+# =========================================================
+# Step 5: Lemmatization
+# =========================================================
+
+# WordNet Lemmatizer
+lemmatizer = WordNetLemmatizer()
+
+# Lemmatize with different POS tags
+# POS:
+# n = noun
+# v = verb
+# a = adjective
+# r = adverb
+
+test_words = [
+    ('running', 'v'),
+    ('runs', 'v'),
+    ('better', 'a'),
+    ('studies', 'v'),
+    ('studying', 'v'),
+    ('geese', 'n'),
+    ('mice', 'n'),
+    ('happily', 'r'),
+    ('played', 'v'),
+    ('connected', 'v'),
+    ('feet', 'n'),
+    ('children', 'n')
+]
+
+print('\nWordNet Lemmatizer Results:')
+
+print('-' * 45)
+
+print(f'{"Original":<15} {"POS":<8} {"Lemma":<15}')
+
+print('-' * 45)
+
+for word, pos in test_words:
+
+    lemma = lemmatizer.lemmatize(word, pos=pos)
+
+    print(f'{word:<15} {pos:<8} {lemma:<15}')
+
+
+# =========================================================
+# Stemming vs Lemmatization Comparison
+# =========================================================
+
+# Compare stemming and lemmatization side by side
+
+comparison_words = [
+    'running',
+    'better',
+    'studies',
+    'geese',
+    'played',
+    'happily',
+    'children'
+]
+
+print('\nStemming vs Lemmatization')
+
+print('-' * 60)
+
+print(f'{"Word":<12} {"Porter":<12} {"Snowball":<12} {"Lemmatizer":<12}')
+
+print('-' * 60)
+
+for word in comparison_words:
+
+    p = porter.stem(word)
+
+    s = snowball.stem(word)
+
+    l = lemmatizer.lemmatize(word, pos='v')
+
+    print(f'{word:<12} {p:<12} {s:<12} {l:<12}')
