@@ -1,0 +1,15 @@
+nlp1-https://temp.sh/fDaYZ/nlp1.txt
+nlp2-https://temp.sh/IgTkJ/nlp2.txt
+nlp3-https://temp.sh/zastX/nlp3.txt
+nlp4-https://temp.sh/ytVxN/NEWNLP4.txt
+nlp5-https://temp.sh/qikUy/nlp5.txt
+
+nnlp1-https://temp.sh/NXBed/newnlp1.txt
+nnlp2-https://temp.sh/LceIE/newnlp2.txt
+nnlp3-https://temp.sh/AajbT/newnlp3.txt
+nnlp4-https://temp.sh/aNIRy/NEWNLP4.txt
+nnlp5-https://temp.sh/eSSik/newnlp5.txt
+
+!pip install gdown
+!gdown --folder "https://drive.google.com/drive/folders/1kN85-j6ovu7HAeR0NTm1FV5TVjn-ABhL?usp=sharing"
+  
